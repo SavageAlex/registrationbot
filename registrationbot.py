@@ -97,7 +97,7 @@ class RegistrationBot:
 
 
 
-RegistrationBot(host="https://google.com/", headless=False, proxy_ip_port="proxy.voip.plus:8080") # , headless=True, proxy_ip_port="91.149.203.12:3128"
+RegistrationBot(host="https://kolejka-wsc.mazowieckie.pl/rezerwacje/pol/login", headless=True, proxy_ip_port="proxy.voip.plus:8080") # , headless=True, proxy_ip_port="91.149.203.12:3128"
 
 # https://whatismyipaddress.com/
 # https://kolejka-wsc.mazowieckie.pl/rezerwacje/pol/login
