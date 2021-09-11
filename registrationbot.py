@@ -30,7 +30,7 @@ def check_exists_by_xpath(browser, xpath):
 
 def make_full_screenshot(browser, on=False):
     if on:
-        date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M%p")
+        date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M:%S%p")
         page_title = browser.title
         screenshot_name = page_title.translate({ord(c): None for c in '!@#$/: '})
         screenshot_name_datestamp = f"{date_created}_{screenshot_name}"
@@ -42,13 +42,13 @@ def make_full_screenshot(browser, on=False):
         logging.info(f'Screenshot: {screenshot_name}')
 
 
-def registration(headless=False, proxy_ip_port="direct://", new_date_found=True, logging_level=logging.DEBUG):
+def registration(headless=False, proxy_ip_port="direct://", make_screenshot=True, logging_level=logging.DEBUG):
 
     logging.basicConfig(level=logging_level, filename='data.log', filemode='a', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
     logging.info("----------START----------\n")
     
-    logging.info(f'New date are avalable: {new_date_found}')
+    logging.info(f'New date are avalable: {make_screenshot}')
 
     user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
 
@@ -102,7 +102,7 @@ def registration(headless=False, proxy_ip_port="direct://", new_date_found=True,
             logging.info("Trying to login")
 
             # Take full page screenshot
-            make_full_screenshot(browser, on=new_date_found)
+            make_full_screenshot(browser, on=make_screenshot)
 
             time.sleep(1)
 
@@ -121,7 +121,7 @@ def registration(headless=False, proxy_ip_port="direct://", new_date_found=True,
 
             logging.info("User are logged successfully\n")
 
-            make_full_screenshot(browser, on=new_date_found)
+            make_full_screenshot(browser, on=make_screenshot)
 
         browser.get(chose_localization_host)
 
@@ -130,8 +130,6 @@ def registration(headless=False, proxy_ip_port="direct://", new_date_found=True,
         browser.get(reservation_host)
 
         time.sleep(2)
-
-        make_full_screenshot(browser, on=new_date_found)
 
         accept_terms = browser.find_element(By.XPATH, "//form[@id='customForm']/p/label[@for='terms']")
         accept_terms.click()
@@ -142,10 +140,10 @@ def registration(headless=False, proxy_ip_port="direct://", new_date_found=True,
         actual_registration_date = all_acceptable_days[-1].text
         all_acceptable_days[-1].click()
 
-        make_full_screenshot(browser, on=new_date_found)
+        make_full_screenshot(browser, on=make_screenshot)
 
-        if new_date_found:
-            date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M%p")
+        if make_screenshot:
+            date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M:%S%p")
             page_source_name_datestamp = f"./page_sources/{date_created}_page_source.html"
             with open(page_source_name_datestamp, "w") as f:
                 f.write(browser.page_source)
@@ -154,27 +152,35 @@ def registration(headless=False, proxy_ip_port="direct://", new_date_found=True,
         return actual_registration_date
 
 
-new_registration_data = 0
-new_date_found_counter = 0
-new_date_found = True
+new_registration_date_list = ['18']
+make_screenshot = False
+max_amount_screenshots = 0
+SCREENSHOTS = 6 # interval 10s
+counter = 0
 while True:
-    actual_registration_date = registration(headless=True, proxy_ip_port="proxy.voip.plus:8080", new_date_found=new_date_found, logging_level=logging.INFO) # , headless=True, proxy_ip_port="91.149.203.12:3128"
+    actual_registration_date = registration(headless=True, proxy_ip_port="proxy.voip.plus:8080", make_screenshot=make_screenshot, logging_level=logging.INFO) # , headless=True, proxy_ip_port="91.149.203.12:3128"
 
-    if actual_registration_date != new_registration_data:
-        
+    if not (actual_registration_date in new_registration_date_list):
+        new_registration_date_list.append(actual_registration_date)
 
-        new_registration_data = actual_registration_date
-        new_date_found_counter += 1
+        max_amount_screenshots = SCREENSHOTS
+        logging.info(f'Available date found: {actual_registration_date}')
+        logging.info("Waiting for 1s\n")
+        time.sleep(1)
 
-        logging.info(f'Number of found dates: {new_date_found_counter}')
+    else:
+        if counter < max_amount_screenshots:
+            make_screenshot = True
+            counter += 1
+            logging.info(f'Making screenshot set number: {counter}')
+            logging.info("Waiting for 10s\n")
+            time.sleep(15)
 
-        new_date_found = True
+        else:
+            logging.info("No new registration date avalable")
 
-    else:    
-        logging.info("No new registration date avalable")
+            make_screenshot = False
+            logging.info("Waiting for 5min\n")
+            time.sleep(300)
 
-        new_date_found = False
-
-    logging.info(f'Last available date: {new_registration_data}')
-    logging.info("Waiting for 5min\n")
-    time.sleep(300)
+    logging.info(f'Registration dates chacked: {new_registration_date_list}')
