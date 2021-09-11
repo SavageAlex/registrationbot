@@ -104,17 +104,11 @@ def registration(headless=False, proxy_ip_port="direct://", make_screenshot=True
             # Take full page screenshot
             make_full_screenshot(browser, on=make_screenshot)
 
-            time.sleep(1)
-
             email_field = browser.find_element(By.ID, "UserEmail")
             email_field.send_keys(USER_EMAIL)
 
-            time.sleep(1)
-
             password_field = browser.find_element(By.ID, "UserPassword")
             password_field.send_keys(USER_PASSWORD)
-
-            time.sleep(1)
 
             submit_btn = browser.find_element(By.XPATH, "//input[@value='Zaloguj']")
             submit_btn.click()
@@ -125,11 +119,7 @@ def registration(headless=False, proxy_ip_port="direct://", make_screenshot=True
 
         browser.get(chose_localization_host)
 
-        time.sleep(2)
-
         browser.get(reservation_host)
-
-        time.sleep(2)
 
         accept_terms = browser.find_element(By.XPATH, "//form[@id='customForm']/p/label[@for='terms']")
         accept_terms.click()
@@ -155,7 +145,7 @@ def registration(headless=False, proxy_ip_port="direct://", make_screenshot=True
 new_registration_date_list = ['18']
 make_screenshot = False
 max_amount_screenshots = 0
-SCREENSHOTS = 6 # interval 10s
+SCREENSHOTS = 60 # interval 15s
 counter = 0
 while True:
     actual_registration_date = registration(headless=True, proxy_ip_port="proxy.voip.plus:8080", make_screenshot=make_screenshot, logging_level=logging.INFO) # , headless=True, proxy_ip_port="91.149.203.12:3128"
@@ -164,12 +154,11 @@ while True:
         new_registration_date_list.append(actual_registration_date)
 
         max_amount_screenshots = SCREENSHOTS
-        logging.info(f'Available date found: {actual_registration_date}')
-        logging.info("Waiting for 1s\n")
-        time.sleep(1)
+        make_screenshot = True
+        logging.info(f'Available date found: {actual_registration_date}\n')
 
     else:
-        if counter < max_amount_screenshots:
+        if counter < max_amount_screenshots -1:
             make_screenshot = True
             counter += 1
             logging.info(f'Making screenshot set number: {counter}')
