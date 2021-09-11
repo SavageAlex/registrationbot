@@ -3,21 +3,23 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 from proxy_connection import check_proxy_connection
-import keyring
+import os
 import time
 import pytz
-from datetime import datetime, timezone
+from datetime import datetime
+import logging
 
 tz = pytz.timezone('Europe/Warsaw')
 
 # from webdriver_manager.chrome import ChromeDriverManager
 # driver = webdriver.Chrome(ChromeDriverManager().install())
 
-USER_EMAIL = "atalaver@gmail.com"
-USER_PASSWORD = keyring.get_password("registrationbot", "SavageAlex")
+USER_EMAIL = os.environ.get('USER_EMAIL')
+USER_PASSWORD = os.environ.get('USER_PASSWORD')
 
 login_host = "https://kolejka-wsc.mazowieckie.pl/rezerwacje/pol/login"
-reservation_host = "https://kolejka-wsc.mazowieckie.pl/rezerwacje/opmenus/terms/200092/200156#loc_2"
+chose_localization_host = "https://kolejka-wsc.mazowieckie.pl/rezerwacje/#loc_2"
+reservation_host = "https://kolejka-wsc.mazowieckie.pl/rezerwacje/opmenus/terms/200092/200156"
 
 def check_exists_by_xpath(browser, xpath):
     try:
@@ -26,31 +28,38 @@ def check_exists_by_xpath(browser, xpath):
         return False
     return True
 
-def make_full_screenshot(browser, screenshot_counter=0):
-    date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M%p")
-    page_title = browser.title
-    screenshot_name = page_title.translate({ord(c): None for c in '!@#$/: '})
-    screenshot_name_datestamp = f"{date_created}_{screenshot_name}"
-    print(screenshot_name)
-    screenshot_path = f'./screenshots/{screenshot_name_datestamp}.png'
-    print(screenshot_path)
+def make_full_screenshot(browser, on=False):
+    if on:
+        date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M%p")
+        page_title = browser.title
+        screenshot_name = page_title.translate({ord(c): None for c in '!@#$/: '})
+        screenshot_name_datestamp = f"{date_created}_{screenshot_name}"
+        screenshot_path = f'./screenshots/{screenshot_name_datestamp}.png'
 
-    el = browser.find_element(By.TAG_NAME, 'body')
-    el.screenshot(screenshot_path)
+        el = browser.find_element(By.TAG_NAME, 'body')
+        el.screenshot(screenshot_path)
+
+        logging.info(f'Screenshot: {screenshot_name}')
 
 
-def registration(headless=False, proxy_ip_port="direct://"):
+def registration(headless=False, proxy_ip_port="direct://", new_date_found=True, logging_level=logging.DEBUG):
+
+    logging.basicConfig(level=logging_level, filename='data.log', filemode='a', format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+
+    logging.INFO("----------START----------\n")
+    
+    logging.info(f'New date are avalable: {new_date_found}')
 
     user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
 
     if proxy_ip_port == "proxy.voip.plus:8080":
-        print(f'Connection with proxy: {proxy_ip_port}')
+        logging.info(f'Connection with proxy: {proxy_ip_port}')
         proxy_checked=False
         while not proxy_checked:
             server, str_port = proxy_ip_port.split(":")
             port = int(str_port)
-            proxy_checked=check_proxy_connection(server, port)
-        print("Proxy connected Succesfully")     
+            proxy_checked=check_proxy_connection(server, port, logging_level=logging_level)
+        logging.info("Proxy connected Succesfully\n")     
 
     options = webdriver.ChromeOptions()
     options.headless = headless
@@ -66,32 +75,34 @@ def registration(headless=False, proxy_ip_port="direct://"):
     if proxy_ip_port == "direct://":
         options.add_argument("--proxy-bypass-list=*")
     else:
-        print(f'Connecting with Proxy: {proxy_ip_port}')
+        logging.info(f'Connecting with Proxy: {proxy_ip_port}')
     options.add_argument("--start-maximized")
     # options.add_argument("--disable-gpu")
     # options.add_argument("--disable-dev-shm-usage")
     # options.add_argument("--no-sandbox") # browser shows it has no this flag
-    print(options.arguments)
     
     chrome_service = Service(executable_path="./chromedriver")
     browser = webdriver.Chrome(service=chrome_service, options=options)
 
-
     
     with browser:
 
+        logging.info("Registration are started\n")
+
+        logging.info("Enter Login page")
         browser.get(login_host)
 
         xpath=f"//li[@class='logo menu-acc-control']/a[@class='dropdown-button']/p[contains(text( ), '{USER_EMAIL}')]"
-        print(xpath)
         user_is_logged = check_exists_by_xpath(browser, xpath)
 
-        print(user_is_logged)
+        logging.info(f'User are logged: {user_is_logged}')
         
         if not user_is_logged:
 
+            logging.info("Trying to login")
+
             # Take full page screenshot
-            make_full_screenshot(browser)
+            make_full_screenshot(browser, on=new_date_found)
 
             time.sleep(1)
 
@@ -108,11 +119,19 @@ def registration(headless=False, proxy_ip_port="direct://"):
             submit_btn = browser.find_element(By.XPATH, "//input[@value='Zaloguj']")
             submit_btn.click()
 
-            make_full_screenshot(browser)
+            logging.info("User are logged successfully\n")
+
+            make_full_screenshot(browser, on=new_date_found)
+
+        browser.get(chose_localization_host)
+
+        time.sleep(2)
 
         browser.get(reservation_host)
 
-        make_full_screenshot(browser)
+        time.sleep(2)
+
+        make_full_screenshot(browser, on=new_date_found)
 
         accept_terms = browser.find_element(By.XPATH, "//form[@id='customForm']/p/label[@for='terms']")
         accept_terms.click()
@@ -120,28 +139,42 @@ def registration(headless=False, proxy_ip_port="direct://"):
         accept_btn.click()
 
         all_acceptable_days = browser.find_elements(By.XPATH, "//div[starts-with(@id, 'zabuto_calendar_')][@class='day good']")
+        actual_registration_date = all_acceptable_days[-1].text
         all_acceptable_days[-1].click()
 
-        make_full_screenshot(browser)
+        make_full_screenshot(browser, on=new_date_found)
 
-        return browser.page_source
+        if new_date_found:
+            date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M%p")
+            page_source_name_datestamp = f"./page_sources/{date_created}_page_source.html"
+            with open(page_source_name_datestamp, "w") as f:
+                f.write(browser.page_source)
+            logging.info(f'New source html file are created: {page_source_name_datestamp}')
+
+        return actual_registration_date
 
 
-saved_source = 0
-counter = 0
+new_registration_data = 0
+new_date_found_counter = 0
+new_date_found = True
 while True:
-    result_page_source = registration(headless=True, proxy_ip_port="proxy.voip.plus:8080") # , headless=True, proxy_ip_port="91.149.203.12:3128"
+    actual_registration_date = registration(headless=True, proxy_ip_port="proxy.voip.plus:8080", new_date_found=new_date_found, logging_level=logging.INFO) # , headless=True, proxy_ip_port="91.149.203.12:3128"
 
-    if result_page_source != saved_source:
-        date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M%p")
-        page_source_name_datestamp = f"./page_sources/{date_created}_page_source.html"
+    if actual_registration_date != new_registration_data:
+        
 
-        with open(page_source_name_datestamp, "w") as f:
-            f.write(result_page_source)
-            saved_source = result_page_source
-            counter += 1
+        new_registration_data = actual_registration_date
+        new_date_found_counter += 1
 
-            print(f'counter: {counter}')
-    
-    print("Waiting for 10min")
-    time.sleep(600)
+        logging.info(f'Number of found dates: {new_date_found_counter}')
+
+        new_date_found = True
+
+    else:    
+        logging.info("No new registration date avalable")
+
+        new_date_found = False
+
+    logging.info(f'Last available date: {new_registration_data}')
+    logging.info("Waiting for 5min\n")
+    time.sleep(300)
