@@ -5,11 +5,12 @@ from selenium.common.exceptions import NoSuchElementException
 from proxy_connection import check_proxy_connection
 import os
 import time
+# import schedule
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
-tz = pytz.timezone('Europe/Warsaw')
+tz_WA = pytz.timezone('Europe/Warsaw')
 
 # from webdriver_manager.chrome import ChromeDriverManager
 # driver = webdriver.Chrome(ChromeDriverManager().install())
@@ -30,7 +31,7 @@ def check_exists_by_xpath(browser, xpath):
 
 def make_full_screenshot(browser, on=False):
     if on:
-        date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M:%S%p")
+        date_created = datetime.now(tz_WA).strftime("%Y_%m_%d-%I:%M:%S%p")
         page_title = browser.title
         screenshot_name = page_title.translate({ord(c): None for c in '!@#$/: '})
         screenshot_name_datestamp = f"{date_created}_{screenshot_name}"
@@ -133,7 +134,7 @@ def registration(headless=False, proxy_ip_port="direct://", make_screenshot=True
         make_full_screenshot(browser, on=make_screenshot)
 
         if make_screenshot:
-            date_created = datetime.now(tz).strftime("%Y_%m_%d-%I:%M:%S%p")
+            date_created = datetime.now(tz_WA).strftime("%Y_%m_%d-%I:%M:%S%p")
             page_source_name_datestamp = f"./page_sources/{date_created}_page_source.html"
             with open(page_source_name_datestamp, "w") as f:
                 f.write(browser.page_source)
@@ -147,29 +148,46 @@ make_screenshot = False
 max_amount_screenshots = 0
 SCREENSHOTS = 60 # interval 15s
 counter = 0
+start_time = "17:59:00"
+running_time = "00:30:00" 
 while True:
-    actual_registration_date = registration(headless=True, proxy_ip_port="proxy.voip.plus:8080", make_screenshot=make_screenshot, logging_level=logging.INFO) # , headless=True, proxy_ip_port="91.149.203.12:3128"
+    now = datetime.now(tz_WA)
+    today_start = now.replace(hour=int(start_time[0:2]), minute=int(start_time[3:5]), second=int(start_time[6:8]))
+    today_stop = today_start + timedelta(hours=int(running_time[0:2]), minutes=int(running_time[3:5]), seconds=int(running_time[6:8]))
+    
+    logging.info(f'Current time: {now}')
 
-    if not (actual_registration_date in new_registration_date_list):
-        new_registration_date_list.append(actual_registration_date)
+    logging.info(f'Schedulled start time: {today_start} and stop time: {today_stop}')
 
-        max_amount_screenshots = SCREENSHOTS
-        make_screenshot = True
-        logging.info(f'Available date found: {actual_registration_date}\n')
+    if today_start <= now <= today_stop:
 
-    else:
-        if counter < max_amount_screenshots -1:
+        logging.info("Schedelled Start")
+
+        actual_registration_date = registration(headless=True, proxy_ip_port="proxy.voip.plus:8080", make_screenshot=make_screenshot, logging_level=logging.INFO) # , headless=True, proxy_ip_port="91.149.203.12:3128"
+
+        if not (actual_registration_date in new_registration_date_list):
+            new_registration_date_list.append(actual_registration_date)
+
+            max_amount_screenshots = SCREENSHOTS
             make_screenshot = True
-            counter += 1
-            logging.info(f'Making screenshot set number: {counter}')
-            logging.info("Waiting for 10s\n")
-            time.sleep(15)
+            logging.info(f'Available date found: {actual_registration_date}\n')
 
         else:
-            logging.info("No new registration date avalable")
+            if counter < max_amount_screenshots -1:
+                make_screenshot = True
+                counter += 1
+                logging.info(f'Making screenshot set number: {counter}')
+                logging.info("Waiting for 10s\n")
+                time.sleep(15)
 
-            make_screenshot = False
-            logging.info("Waiting for 5min\n")
-            time.sleep(300)
+            else:
+                logging.info("No new registration date avalable")
 
-    logging.info(f'Registration dates chacked: {new_registration_date_list}')
+                make_screenshot = False
+                logging.info("Waiting for 5min\n")
+                time.sleep(300)
+
+        logging.info(f'Registration dates chacked: {new_registration_date_list}')
+    else:
+        logging.info("Waiting 1s")
+        time.sleep(1)
