@@ -2,9 +2,9 @@ import time
 import socket
 import logging
 
-server = "proxy.voip.plus"
+server = "" # proxy host name
 port = 8080
-knocking_ports = [15236, 12236]
+knocking_ports = [] # knocking ports list
 
 def port_knocking(server, ports):
     logging.info("Knocking")
